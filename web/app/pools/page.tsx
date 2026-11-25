@@ -79,9 +79,10 @@ export default function PoolsPage() {
                     {row.label ? <p className="text-sm font-medium">{row.label}</p> : null}
                     <p className="font-mono text-xs break-all text-muted">{row.address}</p>
                   </div>
-                  <TextLink className="shrink-0 text-[13px]" href={`/lender?pool=${row.address}`}>
-                    대출
-                  </TextLink>
+                  <div className="flex shrink-0 flex-col items-end gap-1 text-[13px]">
+                    <TextLink href={`/verify?pool=${row.address}`}>검증</TextLink>
+                    <TextLink href={`/lender?pool=${row.address}`}>대출</TextLink>
+                  </div>
                 </div>
                 {open ? (
                   <div className="border-t border-border bg-surface px-5">

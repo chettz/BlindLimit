@@ -19,13 +19,15 @@ export async function POST(request: Request) {
 
   try {
     const form = await request.formData();
-    const pool = poolAddress(request);
+    const publish = publishFlag(form, request);
+    const pool = optionalPool(request, form, publish);
     const tape = await oneFile(form.get("tape"), [".csv"]);
     const contracts = await manyFiles(form.getAll("contracts"), [".pdf", ".txt"]);
     const oracleKey = oracleKeyFromEnv();
     const posted = await runBorrowingBase(
       {
         pool,
+        publish,
         contracts: contracts.map((file) => ({ name: file.name, bytes: file.bytes })),
         tapeCsv: new TextDecoder().decode(tape.bytes),
       },
@@ -43,17 +45,39 @@ export async function POST(request: Request) {
         now: () => Date.now(),
       },
     );
-    return Response.json(toJson(posted));
+    return Response.json(toJson(posted, publish));
   } catch (error) {
     const body = errorBody(error);
     return Response.json(body.json, { status: body.status });
   }
 }
 
-function poolAddress(request: Request): Address {
+function publishFlag(form: FormData, request: Request): boolean {
+  const fromForm = form.get("publish");
+  if (typeof fromForm === "string") {
+    return !(fromForm === "0" || fromForm.toLowerCase() === "false");
+  }
+  const fromQuery = new URL(request.url).searchParams.get("publish");
+  if (fromQuery !== null) {
+    return !(fromQuery === "0" || fromQuery.toLowerCase() === "false");
+  }
+  return true;
+}
+
+function optionalPool(request: Request, form: FormData, publish: boolean): Address | undefined {
   const url = new URL(request.url);
-  const value = url.searchParams.get("pool") ?? process.env.NEXT_PUBLIC_POOL_ADDRESS ?? process.env.POOL_A_ADDRESS;
-  if (!value || !isAddress(value)) throw new PipelineError("풀 주소가 없습니다");
+  const fromForm = form.get("pool");
+  const value =
+    (typeof fromForm === "string" && fromForm) ||
+    url.searchParams.get("pool") ||
+    process.env.NEXT_PUBLIC_POOL_ADDRESS ||
+    process.env.POOL_A_ADDRESS ||
+    undefined;
+  if (!value) {
+    if (publish) throw new PipelineError("풀 주소가 없습니다");
+    return undefined;
+  }
+  if (!isAddress(value)) throw new PipelineError("풀 주소가 올바르지 않습니다");
   return value;
 }
 
@@ -69,7 +93,7 @@ async function saveReceipt(json: string): Promise<void> {
   await writeFile(path.join(dir, `${attestationHashOf(json).slice(2)}.json`), json);
 }
 
-function toJson(result: PipelineResult) {
+function toJson(result: PipelineResult, publish: boolean) {
   return {
     eligibleCount: result.eligibleCount,
     eligibleAmount: result.eligibleAmount.toString(),
@@ -80,6 +104,7 @@ function toJson(result: PipelineResult) {
     txHash: result.txHash,
     attestationHash: result.attestationHash,
     mock: result.mock,
+    published: publish && result.txHash.length > 0,
   };
 }
 

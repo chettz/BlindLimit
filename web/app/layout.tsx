@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "BlindLimit",
-  description: "할부 채권 담보 한도",
+  description: "민감정보 유출 없이 TEE 안 AI로 계약서·장부를 검증하는 프라이버시 담보 레이어",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

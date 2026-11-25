@@ -2,7 +2,7 @@ import { BaseError, ContractFunctionRevertedError, encodeErrorResult } from "vie
 import { describe, expect, it } from "vitest";
 
 import { loanPoolAbi } from "./abi";
-import { borrowErrorMessage, txUrl } from "./display";
+import { borrowErrorMessage, exceedsLimitMessage, txUrl } from "./display";
 
 function reverted(errorName: "ExceedsLimit" | "NotLender" | "ZeroAmount", args?: readonly [bigint, bigint]) {
   const data = encodeErrorResult({ abi: loanPoolAbi, errorName, args });
@@ -18,6 +18,20 @@ describe("borrowErrorMessage", () => {
 
   it("names the lender check", () => {
     expect(borrowErrorMessage(reverted("NotLender"))).toBe("연결된 지갑이 이 풀의 대출사 계정이 아닙니다");
+  });
+
+  it("explains wallet rejection for local demo", () => {
+    expect(borrowErrorMessage(new BaseError("User rejected the request."))).toBe(
+      "지갑에서 요청을 거부했습니다. MetaMask를 Localhost 8545에 연결했는지 확인하세요",
+    );
+  });
+});
+
+describe("exceedsLimitMessage", () => {
+  it("matches the on-chain ExceedsLimit copy", () => {
+    expect(exceedsLimitMessage(2_000_000_000n, 1_000_000_000n)).toBe(
+      "한도 초과 — 가능액 1000 USDC, 요청 2000 USDC (거래 거부됨)",
+    );
   });
 });
 

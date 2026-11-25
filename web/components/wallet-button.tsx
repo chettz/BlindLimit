@@ -42,7 +42,9 @@ export function WalletButton({ fullWidth = false }: { fullWidth?: boolean }) {
       disabled={isPending || connectors.length === 0}
       size="sm"
       onClick={() => {
-        const connector = connectors[0];
+        // Phantom이 ethereum을 가로채면 로컬 anvil 서명이 거절되는 경우가 많음 → MetaMask 우선
+        const connector =
+          connectors.find((item) => /metamask/i.test(item.name) || item.id === "metaMask") ?? connectors[0];
         if (connector) void connect({ connector });
       }}
     >

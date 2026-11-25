@@ -130,7 +130,9 @@ export function PoolDashboard({ address }: { address: Address }) {
     <div className="flex flex-col gap-8">
       <Card>
         <p className="font-mono text-xs text-muted">{address}</p>
-        <TextLink href={`/lender?pool=${address}`}>이 풀에서 담보·대출</TextLink>
+        <TextLink href={`/verify?pool=${address}`}>이 풀에서 검증</TextLink>
+        {" · "}
+        <TextLink href={`/lender?pool=${address}`}>대출</TextLink>
       </Card>
 
       <StatGrid className="sm:grid-cols-2 lg:grid-cols-2">

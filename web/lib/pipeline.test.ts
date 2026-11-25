@@ -172,6 +172,24 @@ describe("runBorrowingBase", () => {
     expect(json(result)).not.toContain(MISSING);
   });
 
+  it("skips postLimit when publish is false", async () => {
+    const { port, posts } = chain();
+    const result = await runBorrowingBase(
+      {
+        pool: POOL,
+        publish: false,
+        contracts: [file(GOOD, "10000")],
+        tapeCsv: tape([`L1,${GOOD},${BORROWER},North Motors,29.90,100.00,90.00,0`]),
+      },
+      deps(port),
+    );
+
+    expect(posts).toHaveLength(0);
+    expect(result.txHash).toBe("");
+    expect(result.eligibleCount).toBe(1);
+    expect(result.limit).toBe(90_000_000n);
+  });
+
   it("returns VIN_RACE when posting reverts with AlreadyPledged", async () => {
     const { port } = chain({ revert: "AlreadyPledged" });
     const error = await runBorrowingBase(

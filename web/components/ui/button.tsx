@@ -16,7 +16,7 @@ export function buttonClassName(
 ) {
   return cn(
     "inline-flex items-center justify-center rounded-[12px] font-medium transition-colors",
-    size === "sm" ? "px-3 py-2 text-sm" : "px-4 py-[13px] text-base",
+    size === "sm" ? "px-3 py-1.5 text-sm" : "px-3.5 py-2 text-sm",
     VARIANT[variant],
     className,
   );

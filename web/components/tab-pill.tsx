@@ -7,8 +7,9 @@ import { cn } from "@/lib/ui/cn";
 
 const TABS = [
   { href: "/", label: "홈", match: (path: string) => path === "/" },
-  { href: "/lender", label: "대출사", match: (path: string) => path === "/lender" },
+  { href: "/verify", label: "검증", match: (path: string) => path.startsWith("/verify") },
   { href: "/lender/agreement", label: "약정", match: (path: string) => path.startsWith("/lender/agreement") },
+  { href: "/lender", label: "대출", match: (path: string) => path === "/lender" },
   { href: "/operator", label: "운영자", match: (path: string) => path.startsWith("/operator") },
   { href: "/pools", label: "풀", match: (path: string) => path.startsWith("/pools") || path.startsWith("/pool/") },
 ] as const;
@@ -113,7 +114,7 @@ export function TabPill() {
     <nav
       ref={navRef}
       aria-label="주요 메뉴"
-      className="tab-glass fixed bottom-5 left-1/2 z-30 flex w-[min(100%-1.5rem,36rem)] -translate-x-1/2 rounded-full p-1"
+      className="tab-glass bottom-5 left-1/2 z-30 flex w-[min(100%-1.5rem,36rem)] -translate-x-1/2 rounded-full p-1"
       role="tablist"
     >
       <span

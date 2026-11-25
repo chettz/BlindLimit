@@ -14,7 +14,8 @@ export function getConfig() {
   const sepoliaRpc = rpc && !local ? rpc : undefined;
   return createConfig({
     chains: [chain],
-    connectors: [injected()],
+    // Phantom이 window.ethereum을 가로채면 로컬 서명이 User rejected로 끝남 → MetaMask 고정
+    connectors: [injected({ target: "metaMask" })],
     transports: {
       [localForkChain.id]: http(localRpc),
       [baseSepolia.id]: http(sepoliaRpc),

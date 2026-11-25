@@ -11,8 +11,21 @@ export type ContractFile = {
   bytes: Uint8Array;
 };
 
+/** 풀 설정이 없을 때(검증만) 쓰는 기본값 — 프로젝트 Settings 6필드 */
+export const DEFAULT_SETTINGS: Settings = {
+  advanceRateBps: 8500,
+  delinquencyCutoffDays: 30,
+  amountToleranceCents: 100n,
+  obligorConcBps: 1000,
+  dealerConcBps: 4000,
+  maxCommitment: 500_000_000_000n,
+};
+
 export type PipelineInput = {
-  pool: Address;
+  /** publish=false 이면 생략 가능. 있으면 해당 풀 설정·이중담보 기준에 사용 */
+  pool?: Address;
+  /** false 면 한도 계산만 하고 postLimit 생략. 기본 true */
+  publish?: boolean;
   contracts: ContractFile[];
   tapeCsv: string;
 };
@@ -80,12 +93,18 @@ type Joined = {
   rateMismatch: boolean;
 };
 
-/** 계약서와 장부를 정규화 VIN 으로 맞춘 뒤 한도를 계산하고 한 트랜잭션으로 게시한다. */
+/** 계약서와 장부를 정규화 VIN 으로 맞춘 뒤 한도를 계산한다. publish=true 이면 한 tx 로 게시. */
 export async function runBorrowingBase(input: PipelineInput, deps: PipelineDeps): Promise<PipelineResult> {
-  if (!isAddress(input.pool)) throw new PipelineError("풀 주소가 올바르지 않습니다");
-  if (!isAddress(deps.signer.address)) throw new PipelineError("오라클 주소가 없습니다");
+  const publish = input.publish !== false;
+  if (publish) {
+    if (!input.pool || !isAddress(input.pool)) throw new PipelineError("풀 주소가 올바르지 않습니다");
+    if (!isAddress(deps.signer.address)) throw new PipelineError("오라클 주소가 없습니다");
+  } else if (input.pool && !isAddress(input.pool)) {
+    throw new PipelineError("풀 주소가 올바르지 않습니다");
+  }
   if (input.contracts.length === 0) throw new PipelineError("계약서가 없습니다");
 
+  const pool = input.pool && isAddress(input.pool) ? input.pool : zeroAddress;
   const docBundleHash = bundleHash([
     ...input.contracts.map((file) => file.bytes),
     new TextEncoder().encode(input.tapeCsv),
@@ -110,7 +129,9 @@ export async function runBorrowingBase(input: PipelineInput, deps: PipelineDeps)
   }
 
   const hashes = [...new Set(joined.map((row) => row.hash))].sort();
-  const pledged = await pledgedElsewhere(input.pool, hashes, deps.chain);
+  const pledged = await pledgedElsewhere(pool, hashes, deps.chain);
+  const settings =
+    pool === zeroAddress ? DEFAULT_SETTINGS : await deps.chain.readSettings(pool);
   const base = computeBorrowingBase(
     joined.map((row) => ({
       idHash: row.hash,
@@ -124,7 +145,7 @@ export async function runBorrowingBase(input: PipelineInput, deps: PipelineDeps)
       rateMismatch: row.rateMismatch,
       pledgedElsewhere: pledged.get(row.hash) ?? false,
     })),
-    await deps.chain.readSettings(input.pool),
+    settings,
   );
 
   const attestation = await deps.tee.getAttestation(String(deps.now()));
@@ -133,20 +154,24 @@ export async function runBorrowingBase(input: PipelineInput, deps: PipelineDeps)
   await deps.saveReceipt(json);
   const attestationHash = attestationHashOf(json);
 
-  const posted = await deps.chain.postLimit(input.pool, {
-    docBundleHash,
-    attestationHash,
-    ruleHash,
-    eligibleCount: base.eligibleCount,
-    eligibleAmount: base.eligibleAmount,
-    limit: base.limit,
-    eligibleVinHashes: base.eligibleVinHashes,
-  });
-  if (posted.status === "reverted") {
-    if (posted.revertName === "AlreadyPledged") {
-      throw new PipelineError("다른 풀에 이미 담보로 잡힌 차량 포함 — 다시 제출", "VIN_RACE");
+  let txHash = "";
+  if (publish) {
+    const posted = await deps.chain.postLimit(pool, {
+      docBundleHash,
+      attestationHash,
+      ruleHash,
+      eligibleCount: base.eligibleCount,
+      eligibleAmount: base.eligibleAmount,
+      limit: base.limit,
+      eligibleVinHashes: base.eligibleVinHashes,
+    });
+    if (posted.status === "reverted") {
+      if (posted.revertName === "AlreadyPledged") {
+        throw new PipelineError("다른 풀에 이미 담보로 잡힌 차량 포함 — 다시 제출", "VIN_RACE");
+      }
+      throw new PipelineError("한도 게시 실패");
     }
-    throw new PipelineError("한도 게시 실패");
+    txHash = posted.txHash;
   }
 
   return {
@@ -160,7 +185,7 @@ export async function runBorrowingBase(input: PipelineInput, deps: PipelineDeps)
       INVALID_VIN: invalidVin,
     },
     vinsRegistered: base.eligibleVinHashes.length,
-    txHash: posted.txHash,
+    txHash,
     attestationHash,
     mock,
   };

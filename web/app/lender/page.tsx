@@ -1,48 +1,34 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
-import { isAddress, parseUnits, type Address } from "viem";
+import { parseUnits, type Address } from "viem";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAccount, useChainId, useReadContract, useWriteContract } from "wagmi";
 
+import { PoolPicker } from "@/components/pool-picker";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+import { FieldLabel, Input } from "@/components/ui/field";
+import { Alert, PageHeader, PageMain, TextLink } from "@/components/ui/page-shell";
+import { Stat, StatGrid } from "@/components/ui/stat";
 import { loanPoolAbi, mockUsdcAbi } from "@/lib/chain/abi";
-import { borrowErrorMessage, formatUsdc, readsLocalFork, txUrl } from "@/lib/chain/display";
+import { borrowErrorMessage, exceedsLimitMessage, formatUsdc, readsLocalFork, txUrl } from "@/lib/chain/display";
 import { appChain } from "@/lib/chain/network";
 import { configuredPoolOptions, pickPool } from "@/lib/chain/pools";
 import { usdcAddress } from "@/lib/chain/wagmi";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
-import { FieldLabel, Input, Select } from "@/components/ui/field";
-import { Alert, PageHeader, PageMain, TextLink } from "@/components/ui/page-shell";
-import { Stat, StatGrid } from "@/components/ui/stat";
-
-import { LenderHistory } from "./history";
-
 const POLL_MS = 10_000;
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
-type CollateralResult = {
-  eligibleCount: number;
-  eligibleAmount: string;
-  limit: string;
-  excluded: {
-    DELINQUENT: number;
-    AMOUNT_MISMATCH: number;
-    RATE_MISMATCH: number;
-    VIN_PLEDGED_ELSEWHERE: number;
-    NO_TAPE_MATCH: number;
-    INVALID_VIN: number;
-  };
-  vinsRegistered: number;
-  txHash: string;
-  mock: boolean;
-};
-
 export default function LenderPage() {
   return (
-    <Suspense fallback={<PageMain><p className="text-sm text-muted">불러오는 중…</p></PageMain>}>
+    <Suspense
+      fallback={
+        <PageMain>
+          <p className="text-sm text-muted">불러오는 중…</p>
+        </PageMain>
+      }
+    >
       <LenderPageContent />
     </Suspense>
   );
@@ -54,8 +40,6 @@ function LenderPageContent() {
   const poolParam = searchParams.get("pool");
   const poolOptions = useMemo(() => configuredPoolOptions(), []);
   const [activePool, setActivePool] = useState<Address | undefined>(() => pickPool(poolParam, poolOptions));
-  const [customPool, setCustomPool] = useState("");
-  const [customError, setCustomError] = useState<string | null>(null);
 
   useEffect(() => {
     setActivePool(pickPool(poolParam, poolOptions));
@@ -85,58 +69,13 @@ function LenderPageContent() {
     query: { ...query, enabled: ready && Boolean(address) },
   });
 
-  const [contracts, setContracts] = useState<File[]>([]);
-  const [tape, setTape] = useState<File | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [result, setResult] = useState<CollateralResult | null>(null);
   const [amount, setAmount] = useState("");
   const [borrowError, setBorrowError] = useState<string | null>(null);
   const [borrowTx, setBorrowTx] = useState<string | null>(null);
 
-  function selectPool(address: Address) {
-    setActivePool(address);
-    setCustomError(null);
-    router.replace(`/lender?pool=${address}`, { scroll: false });
-  }
-
-  function applyCustomPool() {
-    const value = customPool.trim();
-    if (!isAddress(value)) {
-      setCustomError("풀 주소가 올바르지 않습니다");
-      return;
-    }
-    selectPool(value);
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!activePool || contracts.length === 0 || !tape) return;
-    setSubmitting(true);
-    setSubmitError(null);
-    const body = new FormData();
-    for (const file of contracts) body.append("contracts", file);
-    body.append("tape", tape);
-    try {
-      const response = await fetch(`/api/collateral?pool=${activePool}`, { method: "POST", body });
-      const json: unknown = await response.json();
-      if (!response.ok) {
-        setResult(null);
-        setSubmitError(errorText(json));
-        return;
-      }
-      if (!isCollateralResult(json)) {
-        setResult(null);
-        setSubmitError("담보 처리 실패");
-        return;
-      }
-      setResult(json);
-      await Promise.all([limit.refetch(), borrowed.refetch(), available.refetch(), settings.refetch()]);
-    } catch {
-      setSubmitError("담보 처리 실패");
-    } finally {
-      setSubmitting(false);
-    }
+  function selectPool(next: Address) {
+    setActivePool(next);
+    router.replace(`/lender?pool=${next}`, { scroll: false });
   }
 
   async function onBorrow(event: FormEvent<HTMLFormElement>) {
@@ -144,20 +83,38 @@ function LenderPageContent() {
     if (!activePool) return;
     setBorrowError(null);
     setBorrowTx(null);
+
+    let requested: bigint;
+    try {
+      requested = parseUnits(amount.replaceAll(",", ""), 6);
+    } catch {
+      setBorrowError("금액을 확인해 주세요");
+      return;
+    }
+    if (requested === 0n) {
+      setBorrowError("대출 금액이 0입니다");
+      return;
+    }
+    if (available.data !== undefined && requested > available.data) {
+      setBorrowError(exceedsLimitMessage(requested, available.data));
+      return;
+    }
+    if (chainId !== appChain().id) {
+      setBorrowError("지갑 네트워크를 Localhost 8545(체인 31337)로 바꿔 주세요");
+      return;
+    }
+
     try {
       const hash = await writeContractAsync({
         address: activePool,
         abi: loanPoolAbi,
         functionName: "borrow",
-        args: [parseUnits(amount.replaceAll(",", ""), 6)],
+        args: [requested],
+        chainId: appChain().id,
       });
       setBorrowTx(hash);
       await Promise.all([limit.refetch(), borrowed.refetch(), available.refetch(), balance.refetch()]);
     } catch (error) {
-      if (error instanceof Error && error.name.includes("InvalidDecimalNumber")) {
-        setBorrowError("금액을 확인해 주세요");
-        return;
-      }
       setBorrowError(borrowErrorMessage(error));
     }
   }
@@ -165,57 +122,20 @@ function LenderPageContent() {
   return (
     <PageMain>
       <PageHeader
-        title="담보 제출과 대출"
-        description="할부계약서와 장부를 제출해 담보 한도를 갱신하고, 가용 한도 안에서 USDC를 차입합니다."
+        title="온체인 대출"
+        description="검증으로 게시된 한도 안에서 USDC를 차입합니다. 계약서·장부 검증은 검증 메뉴에서 먼저 실행하세요."
+        actions={
+          <TextLink href={activePool ? `/verify?pool=${activePool}` : "/verify"}>계약서·장부 검증</TextLink>
+        }
       />
 
-      <LenderHistory address={address} refreshKey={result?.txHash} />
-
-      <Card>
-        <CardTitle>담보·대출 풀 선택</CardTitle>
-        {poolOptions.length > 0 ? (
-          <FieldLabel>
-            등록된 풀
-            <Select
-              value={inPresetList && activePool ? activePool : ""}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value && isAddress(value)) selectPool(value);
-              }}
-            >
-              {!inPresetList ? <option value="">목록 밖 주소 사용 중</option> : null}
-              {poolOptions.map((row) => (
-                <option key={row.address} value={row.address}>
-                  {row.label} ({shortAddress(row.address)})
-                </option>
-              ))}
-            </Select>
-          </FieldLabel>
-        ) : (
-          <p className="text-sm text-muted">NEXT_PUBLIC_POOL_ADDRESS 가 없으면 아래에 풀 주소를 입력하세요.</p>
-        )}
-        <div className="flex flex-wrap items-end gap-2">
-          <FieldLabel className="min-w-[16rem] flex-1">
-            다른 풀 주소 (팩토리 배포 등)
-            <Input
-              className="font-mono text-xs"
-              placeholder="0x…"
-              value={customPool}
-              onChange={(event) => setCustomPool(event.target.value)}
-            />
-          </FieldLabel>
-          <Button variant="secondary" type="button" onClick={applyCustomPool}>
-            적용
-          </Button>
-        </div>
-        {customError ? <Alert tone="danger">{customError}</Alert> : null}
-        {activePool ? (
-          <p className="text-sm text-muted">
-            선택됨 <span className="font-mono text-foreground">{activePool}</span> ·{" "}
-            <TextLink href={`/pool/${activePool}`}>풀 상세</TextLink>
-          </p>
-        ) : null}
-      </Card>
+      <PoolPicker
+        title="대출 풀 선택"
+        poolOptions={poolOptions}
+        activePool={activePool}
+        inPresetList={inPresetList}
+        onSelect={selectPool}
+      />
 
       {!ready ? <Alert>풀 주소가 설정되지 않았습니다</Alert> : null}
       {readsLocalFork() ? (
@@ -237,35 +157,6 @@ function LenderPageContent() {
       </StatGrid>
 
       <Card>
-        <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-          <CardTitle>담보 제출</CardTitle>
-          <FieldLabel>
-            할부계약서 (.pdf, .txt, 여러 개)
-            <Input
-              type="file"
-              accept=".pdf,.txt,application/pdf,text/plain"
-              multiple
-              onChange={(event) => setContracts(Array.from(event.target.files ?? []))}
-            />
-          </FieldLabel>
-          <FieldLabel>
-            대출장부 (.csv)
-            <Input
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(event) => setTape(event.target.files?.[0] ?? null)}
-            />
-          </FieldLabel>
-          <Button className="w-fit" type="submit" disabled={!ready || submitting || contracts.length === 0 || !tape}>
-            {submitting ? "담보를 계산하는 중입니다" : "담보 제출"}
-          </Button>
-          {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
-        </form>
-      </Card>
-
-      {result ? <ResultCard result={result} /> : null}
-
-      <Card>
         <form className="flex flex-col gap-4" onSubmit={onBorrow}>
           <CardTitle>대출 실행</CardTitle>
           <FieldLabel>
@@ -276,50 +167,10 @@ function LenderPageContent() {
             {borrowing ? "대출 실행 중" : "대출 실행"}
           </Button>
           {borrowError ? <Alert tone="danger">{borrowError}</Alert> : null}
-          {borrowTx ? (
-            <TextLink href={txUrl(borrowTx)}>대출 거래 {shortHash(borrowTx)}</TextLink>
-          ) : null}
+          {borrowTx ? <TextLink href={txUrl(borrowTx)}>대출 거래 {shortHash(borrowTx)}</TextLink> : null}
         </form>
       </Card>
     </PageMain>
-  );
-}
-
-function ResultCard({ result }: { result: CollateralResult }) {
-  const rows = [
-    ["연체", result.excluded.DELINQUENT],
-    ["금액 불일치", result.excluded.AMOUNT_MISMATCH],
-    ["금리 불일치", result.excluded.RATE_MISMATCH],
-    ["장부 미매칭", result.excluded.NO_TAPE_MATCH],
-    ["VIN 형식 오류", result.excluded.INVALID_VIN],
-  ] as const;
-
-  return (
-    <Card>
-      <div className="flex items-center gap-2">
-        <CardTitle>담보 결과</CardTitle>
-        {result.mock ? <Badge tone="mock">Mock</Badge> : null}
-      </div>
-      <p className="text-sm">
-        적격 <span className="font-medium text-foreground">{result.eligibleCount}건</span> ·{" "}
-        {formatUsdc(BigInt(result.eligibleAmount))} USDC
-      </p>
-      <p className="text-sm font-medium text-warning">
-        다른 풀에 담보 잡힌 차량 {result.excluded.VIN_PLEDGED_ELSEWHERE}건
-      </p>
-      <ul className="grid gap-1 text-sm text-muted sm:grid-cols-2">
-        {rows.map(([label, count]) => (
-          <li key={label}>
-            {label} <span className="text-foreground">{count}</span>건
-          </li>
-        ))}
-      </ul>
-      <p className="text-sm text-muted">
-        등록된 VIN <span className="text-foreground">{result.vinsRegistered}</span>건 · 한도{" "}
-        <span className="font-medium text-accent">{formatUsdc(BigInt(result.limit))} USDC</span>
-      </p>
-      <TextLink href={txUrl(result.txHash)}>한도 게시 거래 {shortHash(result.txHash)}</TextLink>
-    </Card>
   );
 }
 
@@ -334,35 +185,4 @@ function shortAddress(value: string | undefined): string {
 
 function shortHash(value: string): string {
   return `${value.slice(0, 10)}…${value.slice(-4)}`;
-}
-
-function errorText(json: unknown): string {
-  if (json && typeof json === "object" && "error" in json && typeof json.error === "string") return json.error;
-  return "담보 처리 실패";
-}
-
-function isCollateralResult(json: unknown): json is CollateralResult {
-  if (!json || typeof json !== "object") return false;
-  const value = json as Partial<CollateralResult>;
-  return (
-    typeof value.eligibleCount === "number" &&
-    typeof value.eligibleAmount === "string" &&
-    typeof value.limit === "string" &&
-    typeof value.vinsRegistered === "number" &&
-    typeof value.txHash === "string" &&
-    typeof value.mock === "boolean" &&
-    isExcluded(value.excluded)
-  );
-}
-
-function isExcluded(value: CollateralResult["excluded"] | undefined): value is CollateralResult["excluded"] {
-  if (!value) return false;
-  return (
-    typeof value.DELINQUENT === "number" &&
-    typeof value.AMOUNT_MISMATCH === "number" &&
-    typeof value.RATE_MISMATCH === "number" &&
-    typeof value.VIN_PLEDGED_ELSEWHERE === "number" &&
-    typeof value.NO_TAPE_MATCH === "number" &&
-    typeof value.INVALID_VIN === "number"
-  );
 }

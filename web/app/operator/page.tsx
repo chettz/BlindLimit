@@ -213,7 +213,7 @@ export default function OperatorPage() {
     <PageMain>
       <PageHeader
         title="약정 선택·배포"
-        description="대출사가 서명한 약정만 선택해 대조 후 팩토리로 풀을 배포합니다. 동일 약정으로도 여러 풀을 배포할 수 있습니다."
+        description="대출사가 서명한 약정만 선택해 대조 후 팩토리로 풀을 배포합니다."
       />
       <TextLink href="/pools">배포된 풀 목록</TextLink>
 
@@ -272,7 +272,9 @@ export default function OperatorPage() {
           <div className="flex flex-wrap gap-3">
             <TextLink href={`/pool/${lastPool}`}>풀 상세</TextLink>
             <TextLink href="/pools">풀 목록</TextLink>
-            <TextLink href={`/lender?pool=${lastPool}`}>대출사 화면</TextLink>
+            <TextLink href={`/verify?pool=${lastPool}`}>검증</TextLink>
+            {" · "}
+            <TextLink href={`/lender?pool=${lastPool}`}>대출</TextLink>
           </div>
         </Card>
       ) : null}

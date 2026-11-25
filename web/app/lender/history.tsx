@@ -109,8 +109,12 @@ export function LenderHistory({ address, refreshKey }: { address: Address | unde
                 거래 {shortHash(row.txHash)}
               </TextLink>
               <span className="mx-2 text-muted">·</span>
+              <TextLink className="text-xs" href={`/verify?pool=${row.pool}`}>
+                검증
+              </TextLink>
+              <span className="mx-2 text-muted">·</span>
               <TextLink className="text-xs" href={`/lender?pool=${row.pool}`}>
-                이 풀 열기
+                대출
               </TextLink>
             </li>
           ))}

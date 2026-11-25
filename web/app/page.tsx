@@ -1,10 +1,10 @@
 import { PageMain } from "@/components/ui/page-shell";
 
 const FLOW = [
-  { step: "1", title: "약정 서명", detail: "대출사" },
-  { step: "2", title: "풀 배포", detail: "운영자" },
-  { step: "3", title: "담보 제출", detail: "한도 산정" },
-  { step: "4", title: "USDC 차입", detail: "한도 내" },
+  { step: "1", title: "약정 대조", detail: "불일치 시 배포 차단" },
+  { step: "2", title: "자가 장부 검증", detail: "계약서↔장부 · TEE" },
+  { step: "3", title: "온체인 집행", detail: "한도 내 차입 / revert" },
+  { step: "4", title: "설정 불변", detail: "단독 변경 불가" },
 ] as const;
 
 export default function Home() {
@@ -12,12 +12,13 @@ export default function Home() {
     <PageMain className="justify-center gap-10 py-12 lg:py-16">
       <div className="mx-auto max-w-3xl text-center">
         <h1 className="text-[36px] font-bold leading-[1.22] tracking-[-0.5px] text-foreground sm:text-[48px] sm:leading-[1.17] sm:tracking-[-1px]">
-          할부 채권 담보 한도를
-          <br className="hidden sm:block" /> 온체인에 게시합니다
+          민감정보·개인정보 유출 없이
+          <br className="hidden sm:block" /> AI로 계약서와 장부를 검증합니다
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base leading-[1.38] text-muted sm:text-lg">
-          원문은 TEE 안에서만 처리됩니다. 체인과 화면에는 해시와 집계만 나가고, 한도 안에서만 차입할 수
-          있습니다.
+          차주 신원·VIN·원금 같은 원문은 TEE 안의 AI만 읽고 외부로 유출되지 않습니다. 화면과 체인에는 문서·영수증 해시와 함께
+          적격 채권 건수·적격 잔여원금 합계·담보 한도만 남기고, 개별 계약 내용은 남기지 않습니다. 
+          담보 적격 판정은 TEE 안의 결정론 코드가 내립니다.
         </p>
       </div>
 
