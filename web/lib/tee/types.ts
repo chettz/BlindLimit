@@ -1,15 +1,16 @@
 import { z } from "zod";
 
 const digits = z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]).transform(String);
+const wholeNumber = z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/).transform(Number)]);
 
 export const contractTermsSchema = z.object({
-  contractNo: z.string().min(1),
-  vin: z.string().length(17),
-  obligorName: z.string().min(1),
-  dealerName: z.string().min(1),
+  contractNo: z.string().optional().default(""),
+  vin: z.string().trim().min(11).max(40),
+  obligorName: z.string().optional().default(""),
+  dealerName: z.string().optional().default(""),
   principalCents: digits,
-  annualRateBps: z.number().int().nonnegative(),
-  daysPastDue: z.number().int().nonnegative(),
+  annualRateBps: wholeNumber,
+  daysPastDue: wholeNumber.optional().default(0),
 });
 
 export const agreementTermsSchema = z.object({

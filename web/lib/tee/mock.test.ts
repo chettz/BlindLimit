@@ -47,6 +47,23 @@ describe("mock provider", () => {
     expect(result.data.maxCommitment).toBe("500000000000");
   });
 
+  it("reads vin, amount financed, and apr from the three contract layouts", async () => {
+    const formA = ["Vehicle Identification Number: 1HGCM82633A004352", "29.90 %", "5. Amount Financed (3 + 4) $12,288.44"].join("\n");
+    const formB = "Vehicle Identification Number 4t1bf1fk5cu514589. USD 18788.44 is financed at an annual percentage rate of 15.9 percent.";
+    const formC = ["SERIAL / VIN          : 5NP JREZK 8 JJ 804765", "PRINCIPAL FINANCED    : 17863.44 USD", "RATE (APR)            : 27.9%"].join("\n");
+
+    await expect(provider.extractInstallmentContract({ text: formA })).resolves.toMatchObject({
+      mock: true,
+      data: { vin: "1HGCM82633A004352", principalCents: "1228844", annualRateBps: 2990 },
+    });
+    await expect(provider.extractInstallmentContract({ text: formB })).resolves.toMatchObject({
+      data: { vin: "4T1BF1FK5CU514589", principalCents: "1878844", annualRateBps: 1590 },
+    });
+    await expect(provider.extractInstallmentContract({ text: formC })).resolves.toMatchObject({
+      data: { vin: "5NPJREZK8JJ804765", principalCents: "1786344", annualRateBps: 2790 },
+    });
+  });
+
   it("returns a mock attestation", async () => {
     await expect(provider.getAttestation("abcd")).resolves.toEqual({ raw: { mock: true }, mock: true });
   });

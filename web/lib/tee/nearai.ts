@@ -1,5 +1,6 @@
 import OpenAI, { APIError } from "openai";
 import type { ChatCompletionContentPart } from "openai/resources/chat/completions";
+import { keccak256, toBytes } from "viem";
 
 import { parseAgreementTerms, parseContractTerms } from "./parse";
 import type { TeeDocument, TeeProvider, TeeResult, TeeSignature } from "./types";
@@ -12,14 +13,10 @@ const SHORT_CONTEXT_CHAR_BUDGET = 12_000;
 const JSON_ONLY = "JSON만 출력. 설명, 마크다운, 코드블록 없이 JSON 객체만 출력.";
 
 const CONTRACT_INSTRUCTION = [
-  "할부계약서에서 아래 키만 추출한다.",
-  "contractNo: 계약번호 문자열",
-  "vin: VIN 17자 문자열",
-  "obligorName: 차주 이름 문자열",
-  "dealerName: 딜러 이름 문자열",
-  "principalCents: 원금의 센트 단위 정수 문자열",
-  "annualRateBps: 연이율 basis points 정수",
-  "daysPastDue: 연체일수 정수",
+  "할부계약서에서 아래 키만 추출한다. 이름, 주소, 전화번호, 계약번호는 넣지 않는다.",
+  "vin: Vehicle Identification Number. 공백을 제외한 17자.",
+  "principalCents: Amount Financed 를 센트 단위 정수 문자열로. 12288.44 달러면 1228844.",
+  "annualRateBps: APR 를 basis points 정수로. 29.90% 면 2990.",
 ].join("\n");
 
 const AGREEMENT_INSTRUCTION = [
@@ -39,7 +36,7 @@ export function createNearAiProvider(): TeeProvider {
     async getAttestation(nonce) {
       const raw = await getJson("/attestation/report", {
         model: modelName(),
-        nonce,
+        nonce: keccak256(toBytes(nonce)).slice(2),
         signing_algo: "ecdsa",
       });
       return { raw, mock: false };

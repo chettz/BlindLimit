@@ -43,6 +43,7 @@ describe("parseContractTerms", () => {
     const fenced = `\`\`\`json\n${json}\n\`\`\``;
     const explained = `앞설명\n${json}\n뒤설명`;
     expect(parseContractTerms(fenced).principalCents).toBe("1000000");
+    expect(parseContractTerms(JSON.stringify({ ...payload, annualRateBps: "2990" })).annualRateBps).toBe(2990);
     expect(parseContractTerms(json).vin).toBe(payload.vin);
     expect(parseContractTerms(explained).contractNo).toBe("C-1");
 

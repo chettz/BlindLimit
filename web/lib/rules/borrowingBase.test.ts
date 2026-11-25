@@ -26,11 +26,12 @@ function settings(overrides: Partial<Settings> = {}): Settings {
 }
 
 function row(overrides: Partial<Receivable> = {}): Receivable {
-  return {
+  const next: Receivable = {
     idHash: "id",
     vinHash: VIN_A,
     contractPrincipalCents: 10_000n,
     tapePrincipalCents: 10_000n,
+    balanceCents: 10_000n,
     daysPastDue: 0,
     obligorKey: "obligor",
     dealerKey: "dealer",
@@ -38,6 +39,8 @@ function row(overrides: Partial<Receivable> = {}): Receivable {
     pledgedElsewhere: false,
     ...overrides,
   };
+  if (overrides.balanceCents === undefined) next.balanceCents = next.tapePrincipalCents;
+  return next;
 }
 
 describe("computeBorrowingBase", () => {
@@ -185,7 +188,7 @@ describe("computeBorrowingBase", () => {
   });
 
   it("hashes the rule description and version", () => {
-    expect(RULE_VERSION).toBe("v2");
+    expect(RULE_VERSION).toBe("v3");
     expect(ruleHash).toBe(keccak256(toHex(`${RULE_DESCRIPTION}${RULE_VERSION}`)));
   });
 });

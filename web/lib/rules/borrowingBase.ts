@@ -15,6 +15,7 @@ export type Receivable = {
   vinHash: `0x${string}`;
   contractPrincipalCents: bigint;
   tapePrincipalCents: bigint;
+  balanceCents: bigint;
   daysPastDue: number;
   obligorKey: string;
   dealerKey: string;
@@ -40,10 +41,10 @@ export type BorrowingBase = {
   excluded: Record<ExclusionReason, number>;
 };
 
-export const RULE_VERSION = "v2";
+export const RULE_VERSION = "v3";
 
 export const RULE_DESCRIPTION =
-  "A receivable is ineligible when daysPastDue > delinquencyCutoffDays (DELINQUENT), abs(contractPrincipalCents - tapePrincipalCents) > amountToleranceCents (AMOUNT_MISMATCH), rateMismatch (RATE_MISMATCH), or pledgedElsewhere (VIN_PLEDGED_ELSEWHERE). Every matching reason is counted. eligibleAmount is the sum of eligible tapePrincipalCents * 10^4 (USDC 6 decimals). concentrationExcess is the sum of obligor and dealer totals above eligibleAmount * concBps / 10000; concBps 0 disables that side. limit = max(eligibleAmount - concentrationExcess, 0) * advanceRateBps / 10000, rounded down. maxCommitment is not applied.";
+  "A receivable is ineligible when daysPastDue > delinquencyCutoffDays (DELINQUENT), abs(contractPrincipalCents - tapePrincipalCents) > amountToleranceCents (AMOUNT_MISMATCH), rateMismatch (RATE_MISMATCH), or pledgedElsewhere (VIN_PLEDGED_ELSEWHERE). Every matching reason is counted. eligibleAmount is the sum of eligible balanceCents * 10^4 (remaining principal, USDC 6 decimals). concentrationExcess is the sum of obligor and dealer totals above eligibleAmount * concBps / 10000; concBps 0 disables that side. limit = max(eligibleAmount - concentrationExcess, 0) * advanceRateBps / 10000, rounded down. maxCommitment is not applied.";
 
 export const ruleHash = keccak256(toHex(`${RULE_DESCRIPTION}${RULE_VERSION}`));
 
@@ -108,7 +109,7 @@ export function computeBorrowingBase(rows: readonly Receivable[], settings: Sett
       continue;
     }
 
-    const amount = toUsdc(row.tapePrincipalCents);
+    const amount = toUsdc(row.balanceCents);
     eligibleCount += 1;
     eligibleAmount += amount;
     addAmount(obligorTotals, row.obligorKey, amount);
