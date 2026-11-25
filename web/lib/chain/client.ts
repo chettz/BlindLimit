@@ -2,23 +2,24 @@ import "server-only";
 
 import { createPublicClient, createWalletClient, http, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
 
-export const chain = baseSepolia;
+import { appChain } from "./network";
 
 export function getPublicClient() {
+  const url = rpcUrl();
   return createPublicClient({
-    chain: baseSepolia,
-    transport: http(rpcUrl()),
+    chain: appChain(url),
+    transport: http(url),
   });
 }
 
 /// 오라클 키로 서명하는 서버 지갑. 한도 게시에 쓴다.
 export function getOracleWalletClient() {
+  const url = rpcUrl();
   return createWalletClient({
     account: privateKeyToAccount(oracleKey()),
-    chain: baseSepolia,
-    transport: http(rpcUrl()),
+    chain: appChain(url),
+    transport: http(url),
   });
 }
 
