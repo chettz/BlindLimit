@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { keccak256, type Hex } from "viem";
 import { useAccount, useConnect, useSignMessage } from "wagmi";
 
+import { AGREEMENT_ACCEPT } from "@/lib/agreements/formats";
+
 export default function LenderAgreementPage() {
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: connecting } = useConnect();
@@ -59,7 +61,9 @@ export default function LenderAgreementPage() {
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold">대출사 — 약정서 서명</h1>
-        <p className="text-sm text-zinc-600">PDF 해시에 서명하면 운영자가 같은 약정으로 풀을 배포할 수 있습니다.</p>
+        <p className="text-sm text-zinc-600">
+          약정서(PDF·TXT·이미지) 바이트 해시에 서명하면 운영자가 같은 약정으로 풀을 배포할 수 있습니다.
+        </p>
       </header>
 
       {!isConnected ? (
@@ -77,8 +81,8 @@ export default function LenderAgreementPage() {
 
       <form className="flex flex-col gap-4" onSubmit={onSubmit}>
         <label className="flex flex-col gap-1 text-sm">
-          약정서 (PDF)
-          <input accept=".pdf" className="text-sm" type="file" onChange={(event) => onHashFile(event.target.files?.[0] ?? null)} />
+          약정서 (PDF · TXT · 이미지)
+          <input accept={AGREEMENT_ACCEPT} className="text-sm" type="file" onChange={(event) => onHashFile(event.target.files?.[0] ?? null)} />
         </label>
         {hash ? <p className="text-xs text-zinc-500">약정 해시 {hash.slice(0, 18)}…</p> : null}
         <button

@@ -8,6 +8,7 @@ export type AgreementRecord = {
   lender: Address;
   lenderSig: Hex;
   submittedAt: number;
+  fileName?: string;
 };
 
 export type AgreementListItem = {
@@ -26,8 +27,9 @@ function catalogPath(): string {
   return path.join(agreementsDir(), "agreements.json");
 }
 
-function filePath(agreementHash: Hex): string {
-  return path.join(agreementsDir(), `${agreementHash.slice(2)}.pdf`);
+function filePath(agreementHash: Hex, fileName?: string): string {
+  const ext = extensionFromName(fileName) ?? ".pdf";
+  return path.join(agreementsDir(), `${agreementHash.slice(2)}${ext}`);
 }
 
 export async function listAgreements(): Promise<AgreementListItem[]> {
@@ -53,9 +55,11 @@ export async function readAgreement(agreementHash: Hex): Promise<AgreementRecord
   return rows.find((row) => row.agreementHash.toLowerCase() === agreementHash.toLowerCase());
 }
 
-export async function readAgreementBytes(agreementHash: Hex): Promise<Uint8Array> {
-  const bytes = await readFile(filePath(agreementHash));
-  return new Uint8Array(bytes);
+export async function readAgreementBytes(agreementHash: Hex): Promise<{ bytes: Uint8Array; fileName: string }> {
+  const record = await readAgreement(agreementHash);
+  const fileName = record?.fileName ?? "agreement.pdf";
+  const bytes = await readFile(filePath(agreementHash, fileName));
+  return { bytes: new Uint8Array(bytes), fileName };
 }
 
 export async function saveAgreement(input: {
@@ -63,16 +67,18 @@ export async function saveAgreement(input: {
   lender: Address;
   lenderSig: Hex;
   bytes: Uint8Array;
+  fileName: string;
 }): Promise<AgreementRecord> {
   const agreementHash = input.agreementHash.toLowerCase() as Hex;
   const lender = getAddress(input.lender);
   await mkdir(agreementsDir(), { recursive: true });
-  await writeFile(filePath(agreementHash), input.bytes);
+  await writeFile(filePath(agreementHash, input.fileName), input.bytes);
   const record: AgreementRecord = {
     agreementHash,
     lender,
     lenderSig: input.lenderSig,
     submittedAt: Date.now(),
+    fileName: input.fileName,
   };
   const rows = await readCatalog();
   const next = rows.filter((row) => row.agreementHash.toLowerCase() !== agreementHash.toLowerCase());
@@ -108,9 +114,18 @@ function isRecord(value: unknown): value is AgreementRecord {
 
 export async function agreementFileExists(agreementHash: Hex): Promise<boolean> {
   try {
-    await access(filePath(agreementHash));
+    const record = await readAgreement(agreementHash);
+    await access(filePath(agreementHash, record?.fileName));
     return true;
   } catch {
     return false;
   }
+}
+
+function extensionFromName(fileName: string | undefined): string | undefined {
+  if (!fileName) return undefined;
+  const lower = fileName.toLowerCase();
+  const index = lower.lastIndexOf(".");
+  if (index < 0) return undefined;
+  return lower.slice(index);
 }

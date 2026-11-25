@@ -1,14 +1,15 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type FormEvent } from "react";
 import { isAddress, parseUnits, type Address } from "viem";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAccount, useChainId, useConnect, useDisconnect, useReadContract, useWriteContract } from "wagmi";
 
 import { loanPoolAbi, mockUsdcAbi } from "@/lib/chain/abi";
 import { borrowErrorMessage, formatUsdc, readsLocalFork, txUrl } from "@/lib/chain/display";
 import { appChain } from "@/lib/chain/network";
-import { poolAddress, usdcAddress } from "@/lib/chain/wagmi";
+import { configuredPoolOptions, pickPool } from "@/lib/chain/pools";
+import { usdcAddress } from "@/lib/chain/wagmi";
 
 const POLL_MS = 10_000;
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -39,9 +40,19 @@ export default function LenderPage() {
 }
 
 function LenderPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const poolParam = searchParams.get("pool");
-  const activePool: Address | undefined = poolParam && isAddress(poolParam) ? poolParam : poolAddress;
+  const poolOptions = useMemo(() => configuredPoolOptions(), []);
+  const [activePool, setActivePool] = useState<Address | undefined>(() => pickPool(poolParam, poolOptions));
+  const [customPool, setCustomPool] = useState("");
+  const [customError, setCustomError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActivePool(pickPool(poolParam, poolOptions));
+  }, [poolParam, poolOptions]);
+
+  const inPresetList = poolOptions.some((row) => row.address.toLowerCase() === activePool?.toLowerCase());
 
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -75,6 +86,21 @@ function LenderPageContent() {
   const [amount, setAmount] = useState("");
   const [borrowError, setBorrowError] = useState<string | null>(null);
   const [borrowTx, setBorrowTx] = useState<string | null>(null);
+
+  function selectPool(address: Address) {
+    setActivePool(address);
+    setCustomError(null);
+    router.replace(`/lender?pool=${address}`, { scroll: false });
+  }
+
+  function applyCustomPool() {
+    const value = customPool.trim();
+    if (!isAddress(value)) {
+      setCustomError("풀 주소가 올바르지 않습니다");
+      return;
+    }
+    selectPool(value);
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -154,6 +180,55 @@ function LenderPageContent() {
           </button>
         )}
       </header>
+
+      <section className="flex flex-col gap-3 rounded-xl border p-4">
+        <h2 className="text-lg font-semibold">담보·대출 풀 선택</h2>
+        {poolOptions.length > 0 ? (
+          <label className="flex flex-col gap-1 text-sm">
+            등록된 풀
+            <select
+              className="rounded border px-3 py-2 font-mono text-sm"
+              value={inPresetList && activePool ? activePool : ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value && isAddress(value)) selectPool(value);
+              }}
+            >
+              {!inPresetList ? <option value="">목록 밖 주소 사용 중</option> : null}
+              {poolOptions.map((row) => (
+                <option key={row.address} value={row.address}>
+                  {row.label} ({shortAddress(row.address)})
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="text-sm text-zinc-500">NEXT_PUBLIC_POOL_ADDRESS 가 없으면 아래에 풀 주소를 입력하세요.</p>
+        )}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-sm">
+            다른 풀 주소 (팩토리 배포 등)
+            <input
+              className="rounded border px-3 py-2 font-mono text-sm"
+              placeholder="0x…"
+              value={customPool}
+              onChange={(event) => setCustomPool(event.target.value)}
+            />
+          </label>
+          <button className="rounded-full border px-4 py-2 text-sm" type="button" onClick={applyCustomPool}>
+            적용
+          </button>
+        </div>
+        {customError ? <p className="text-sm text-red-700">{customError}</p> : null}
+        {activePool ? (
+          <p className="text-sm">
+            선택됨 <span className="font-mono">{activePool}</span>{" "}
+            <a className="underline" href={`/pool/${activePool}`}>
+              풀 상세
+            </a>
+          </p>
+        ) : null}
+      </section>
 
       {!ready ? <p>풀 주소가 설정되지 않았습니다</p> : null}
       {readsLocalFork() ? (

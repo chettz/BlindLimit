@@ -42,6 +42,7 @@ export type TeeResult<T> = {
 export type TeeDocument = {
   text?: string;
   imagePngBase64?: string;
+  imageMime?: string;
 };
 
 export interface TeeProvider {

@@ -10,6 +10,9 @@ export default function Home() {
         <a className="w-fit rounded-full border border-zinc-900 px-4 py-2" href="/lender/agreement">
           대출사 약정 서명
         </a>
+        <a className="w-fit rounded-full border border-zinc-900 px-4 py-2" href="/lender/agreement">
+          대출사 약정 서명
+        </a>
         <a className="w-fit rounded-full border border-zinc-900 px-4 py-2" href="/operator">
           운영자 화면
         </a>

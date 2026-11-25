@@ -87,9 +87,10 @@ function userContent(instruction: string, doc: TeeDocument): string | ChatComple
   if (!doc.imagePngBase64) return `${instruction}\n\n${doc.text ?? ""}`;
   const parts: ChatCompletionContentPart[] = [{ type: "text", text: instruction }];
   if (doc.text) parts.push({ type: "text", text: doc.text });
+  const mime = doc.imageMime ?? "image/png";
   parts.push({
     type: "image_url",
-    image_url: { url: `data:image/png;base64,${doc.imagePngBase64}` },
+    image_url: { url: `data:${mime};base64,${doc.imagePngBase64}` },
   });
   return parts;
 }
