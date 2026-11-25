@@ -16,7 +16,7 @@ importers:
         version: 16.4.6(@babel/core@7.29.13(supports-color@7.2.0))(@types/node@20.19.43)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       openai:
         specifier: ^7.63.0
-        version: 7.63.0(ws@8.21.0(bufferutil@4.2.0)(utf-8-validate@5.0.10))(zod@4.6.7)
+        version: 7.63.0(ws@8.18.0(bufferutil@4.2.0)(utf-8-validate@5.0.10))(zod@4.6.7)
       pdf-parse:
         specifier: ^2.4.5
         version: 2.4.5
@@ -26,6 +26,9 @@ importers:
       react-dom:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
       viem:
         specifier: ^2.58.4
         version: 2.58.4(bufferutil@4.2.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.7)
@@ -3580,6 +3583,9 @@ packages:
     resolution: {integrity: sha512-9lpSSU4Mly3mrtruwLs1eLK6+gzbzqeBFwRNjIjE+9LuDpWdYctrQlQ3ej1Ilgi7gknpsTRnPoLP8DpCHqHIJw==}
     engines: {node: '>=10'}
     hasBin: true
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
@@ -8392,9 +8398,9 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  openai@7.63.0(ws@8.21.0(bufferutil@4.2.0)(utf-8-validate@5.0.10))(zod@4.6.7):
+  openai@7.63.0(ws@8.18.0(bufferutil@4.2.0)(utf-8-validate@5.0.10))(zod@4.6.7):
     optionalDependencies:
-      ws: 8.21.0(bufferutil@4.2.0)(utf-8-validate@5.0.10)
+      ws: 8.18.0(bufferutil@4.2.0)(utf-8-validate@5.0.10)
       zod: 4.6.7
 
   openapi-fetch@0.13.8:
@@ -8784,6 +8790,8 @@ snapshots:
   semver@6.3.2: {}
 
   semver@7.8.6: {}
+
+  server-only@0.0.1: {}
 
   set-blocking@2.0.0: {}
 
