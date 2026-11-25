@@ -1,12 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { parseUnits, type Address, type Hex } from "viem";
-import { useAccount, useConnect, usePublicClient, useSignMessage, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useAccount, useSignMessage, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 
 import { poolFactoryAbi } from "@/lib/chain/poolFactoryAbi";
 import { poolCreatedAddress, settingsTuple, type AgreementDetail } from "@/lib/chain/factory";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+import { FieldLabel, Input } from "@/components/ui/field";
+import { Alert, PageHeader, PageMain, TextLink } from "@/components/ui/page-shell";
+
 import { factoryAddress, oracleAddress, usdcAddress } from "@/lib/chain/wagmi";
 
 type FieldRow = {
@@ -40,10 +45,7 @@ const DEFAULT = {
 };
 
 export default function OperatorPage() {
-  const router = useRouter();
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: connecting } = useConnect();
-  const publicClient = usePublicClient();
   const { signMessageAsync, isPending: signing } = useSignMessage();
   const { writeContractAsync, isPending: deploying } = useWriteContract();
 
@@ -61,6 +63,7 @@ export default function OperatorPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CheckResult | null>(null);
   const [deployTx, setDeployTx] = useState<Hex | undefined>();
+  const [lastPool, setLastPool] = useState<Address | null>(null);
 
   const { data: deployReceipt } = useWaitForTransactionReceipt({ hash: deployTx });
 
@@ -77,10 +80,16 @@ export default function OperatorPage() {
   }, [selectedHash]);
 
   useEffect(() => {
-    if (!deployReceipt || !publicClient) return;
+    if (!deployReceipt) return;
     const pool = poolCreatedAddress(deployReceipt);
-    if (pool) router.push(`/pool/${pool}`);
-  }, [deployReceipt, publicClient, router]);
+    if (!pool) return;
+    setLastPool(pool);
+    void fetch("/api/pools", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address: pool, txHash: deployReceipt.transactionHash }),
+    });
+  }, [deployReceipt]);
 
   async function loadCatalog() {
     try {
@@ -201,48 +210,41 @@ export default function OperatorPage() {
     Boolean(result?.ok && detail && factoryAddress && usdcAddress && oracleAddress && isConnected && !deploying && !signing);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">운영자 — 약정 선택·배포</h1>
-        <p className="text-sm text-zinc-600">대출사가 서명한 약정만 선택해 대조 후 팩토리로 풀을 배포합니다.</p>
-      </header>
+    <PageMain>
+      <PageHeader
+        title="약정 선택·배포"
+        description="대출사가 서명한 약정만 선택해 대조 후 팩토리로 풀을 배포합니다. 동일 약정으로도 여러 풀을 배포할 수 있습니다."
+      />
+      <TextLink href="/pools">배포된 풀 목록</TextLink>
 
-      {!isConnected ? (
-        <button
-          className="w-fit rounded-full bg-zinc-900 px-4 py-2 text-white disabled:opacity-50"
-          type="button"
-          disabled={connecting}
-          onClick={() => connect({ connector: connectors[0] })}
-        >
-          운영자 지갑 연결
-        </button>
-      ) : (
-        <p className="text-sm">연결됨 {address}</p>
-      )}
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">서명된 약정</h2>
-        {catalog.length === 0 ? <p className="text-sm text-zinc-500">등록된 약정이 없습니다.</p> : null}
+      <Card>
+        <CardTitle>서명된 약정</CardTitle>
+        {catalog.length === 0 ? <p className="text-sm text-muted">등록된 약정이 없습니다.</p> : null}
         <ul className="flex flex-col gap-2">
           {catalog.map((item) => (
             <li key={item.agreementHash}>
               <button
-                className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${selectedHash === item.agreementHash ? "border-zinc-900 bg-zinc-50" : ""}`}
+                className={`w-full rounded-[12px] border px-3 py-2.5 text-left text-sm transition ${
+                  selectedHash === item.agreementHash
+                    ? "border-accent bg-accent-muted"
+                    : "border-border bg-white hover:border-accent-hover"
+                }`}
                 type="button"
                 onClick={() => setSelectedHash(item.agreementHash)}
               >
-                <p className="font-mono text-xs">{item.agreementHash.slice(0, 14)}…</p>
-                <p>대출사 {item.lender.slice(0, 10)}…</p>
-                <p className="text-zinc-500">{new Date(item.submittedAt).toLocaleString("ko-KR")}</p>
+                <p className="font-mono text-xs text-muted">{item.agreementHash.slice(0, 14)}…</p>
+                <p className="text-foreground">대출사 {item.lender.slice(0, 10)}…</p>
+                <p className="text-xs text-muted">{new Date(item.submittedAt).toLocaleString("ko-KR")}</p>
               </button>
             </li>
           ))}
         </ul>
-      </section>
+      </Card>
 
-      <form className="flex flex-col gap-4" onSubmit={onCheck}>
-        <p className="text-sm font-medium">풀 설정 (약정과 대조)</p>
-        <div className="grid gap-3 sm:grid-cols-2">
+      <Card>
+        <form className="flex flex-col gap-4" onSubmit={onCheck}>
+          <CardTitle>풀 설정 (약정과 대조)</CardTitle>
+          <div className="grid gap-3 sm:grid-cols-2">
           <NumberField label="선급률 (%)" value={advanceRatePercent} onChange={setAdvanceRatePercent} />
           <NumberField label="연체 기준일 (일)" value={delinquencyCutoffDays} onChange={setDelinquencyCutoffDays} />
           <NumberField label="금액 허용오차 (USD)" value={amountToleranceDollars} onChange={setAmountToleranceDollars} />
@@ -251,39 +253,46 @@ export default function OperatorPage() {
           <NumberField label="최대 약정액 (USDC)" value={maxCommitmentUsdc} onChange={setMaxCommitmentUsdc} />
         </div>
 
-        <button
-          className="w-fit rounded-full border border-zinc-900 px-4 py-2 disabled:opacity-50"
-          type="submit"
-          disabled={!selectedHash || checking}
-        >
-          {checking ? "대조 중" : "약정 대조"}
-        </button>
-        {error ? <p className="text-red-700">{error}</p> : null}
-      </form>
+          <Button className="w-fit" variant="secondary" type="submit" disabled={!selectedHash || checking}>
+            {checking ? "대조 중" : "약정 대조"}
+          </Button>
+          {error ? <Alert tone="danger">{error}</Alert> : null}
+        </form>
+      </Card>
 
       {result ? <CompareCard result={result} /> : null}
 
-      <button
-        className="w-fit rounded-full bg-zinc-900 px-4 py-2 text-white disabled:opacity-50"
-        type="button"
-        disabled={!canDeploy}
-        onClick={() => void onDeploy()}
-      >
+      <Button className="w-fit" disabled={!canDeploy} onClick={() => void onDeploy()}>
         {deploying || signing ? "배포 중" : "풀 배포 (팩토리)"}
-      </button>
-      {!factoryAddress ? <p className="text-sm text-red-700">NEXT_PUBLIC_FACTORY_ADDRESS 가 없습니다</p> : null}
-      {!oracleAddress ? <p className="text-sm text-red-700">NEXT_PUBLIC_ORACLE_ADDRESS 가 없습니다</p> : null}
-    </main>
+      </Button>
+      {lastPool ? (
+        <Card className="border-success/30 bg-success-muted">
+          <p className="text-sm font-medium text-success">최근 배포한 풀</p>
+          <p className="font-mono text-xs break-all text-foreground">{lastPool}</p>
+          <div className="flex flex-wrap gap-3">
+            <TextLink href={`/pool/${lastPool}`}>풀 상세</TextLink>
+            <TextLink href="/pools">풀 목록</TextLink>
+            <TextLink href={`/lender?pool=${lastPool}`}>대출사 화면</TextLink>
+          </div>
+        </Card>
+      ) : null}
+      {!factoryAddress ? <Alert tone="danger">NEXT_PUBLIC_FACTORY_ADDRESS 가 없습니다</Alert> : null}
+      {!oracleAddress ? <Alert tone="danger">NEXT_PUBLIC_ORACLE_ADDRESS 가 없습니다</Alert> : null}
+    </PageMain>
   );
 }
 
 function CompareCard({ result }: { result: CheckResult }) {
   const mismatches = result.fields.filter((field) => !field.match);
   return (
-    <section className="flex flex-col gap-3 rounded-xl border p-4">
-      <h2 className="text-lg font-semibold">{result.ok ? "배포 가능" : "배포 차단"}</h2>
+    <Card className={result.ok ? "border-success/25" : "border-danger/30"}>
+      <div className="flex items-center gap-2">
+        <CardTitle>{result.ok ? "배포 가능" : "배포 차단"}</CardTitle>
+        {result.mock ? <Badge tone="mock">Mock</Badge> : null}
+        <Badge tone={result.ok ? "success" : "danger"}>{result.ok ? "OK" : "Blocked"}</Badge>
+      </div>
       {!result.ok && mismatches.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm text-red-800">
+        <ul className="flex flex-col gap-1 text-sm text-danger">
           {mismatches.map((field) => (
             <li key={field.name}>
               {field.labelKo} 약정서 {field.agreement} ≠ 설정 {field.setting} — 배포 차단
@@ -291,27 +300,39 @@ function CompareCard({ result }: { result: CheckResult }) {
           ))}
         </ul>
       ) : null}
-      <table className="w-full text-left text-sm">
-        <tbody>
-          {result.fields.map((field) => (
-            <tr key={field.name} className={field.match ? undefined : "bg-red-50 text-red-900"}>
-              <td className="py-1 pr-2">{field.labelKo}</td>
-              <td className="py-1 pr-2">{field.agreement}</td>
-              <td className="py-1 pr-2">{field.setting}</td>
+      <div className="overflow-x-auto rounded-[12px] border border-border">
+        <table className="w-full min-w-[20rem] text-left text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs font-medium text-muted">
+              <th className="px-3 py-2 font-medium">항목</th>
+              <th className="px-3 py-2 font-medium">약정서</th>
+              <th className="px-3 py-2 font-medium">설정</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
+          </thead>
+          <tbody>
+            {result.fields.map((field) => (
+              <tr
+                key={field.name}
+                className={field.match ? "border-b border-border/60" : "bg-danger-muted text-danger"}
+              >
+                <td className="px-3 py-2">{field.labelKo}</td>
+                <td className="px-3 py-2">{field.agreement}</td>
+                <td className="px-3 py-2">{field.setting}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }
 
 function NumberField({ label, value, onChange }: { label: string; value: string; onChange: (next: string) => void }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
+    <FieldLabel>
       {label}
-      <input className="rounded border px-3 py-2" inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
-    </label>
+      <Input inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
+    </FieldLabel>
   );
 }
 

@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { AppNav } from "./app-nav";
-import { Providers } from "./providers";
+import { Geist_Mono, IBM_Plex_Sans_KR } from "next/font/google";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+import { AppShell } from "./app-shell";
+import { Providers } from "./providers";
+import "./globals.css";
+
+const ibmPlex = IBM_Plex_Sans_KR({
+  variable: "--font-ibm-plex",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -21,16 +25,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full">
+    <html lang="ko" className={`${ibmPlex.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-full bg-transparent text-foreground">
         <Providers>
-          <div className="flex min-h-full">
-            <AppNav />
-            <div className="min-w-0 flex-1">{children}</div>
-          </div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

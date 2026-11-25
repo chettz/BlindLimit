@@ -2,13 +2,16 @@
 
 import { useState, type FormEvent } from "react";
 import { keccak256, type Hex } from "viem";
-import { useAccount, useConnect, useSignMessage } from "wagmi";
+import { useAccount, useSignMessage } from "wagmi";
 
 import { AGREEMENT_ACCEPT } from "@/lib/agreements/formats";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+import { FieldLabel, Input } from "@/components/ui/field";
+import { Alert, PageHeader, PageMain } from "@/components/ui/page-shell";
 
 export default function LenderAgreementPage() {
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: connecting } = useConnect();
   const { signMessageAsync, isPending: signing } = useSignMessage();
 
   const [file, setFile] = useState<File | null>(null);
@@ -58,51 +61,39 @@ export default function LenderAgreementPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">대출사 — 약정서 서명</h1>
-        <p className="text-sm text-zinc-600">
-          약정서(PDF·TXT·이미지) 바이트 해시에 서명하면 운영자가 같은 약정으로 풀을 배포할 수 있습니다.
-        </p>
-      </header>
+    <PageMain>
+      <PageHeader
+        title="약정서 서명"
+        description="약정서(PDF·TXT·이미지) 바이트 해시에 서명하면 운영자가 같은 약정으로 풀을 배포할 수 있습니다."
+      />
 
-      {!isConnected ? (
-        <button
-          className="w-fit rounded-full bg-zinc-900 px-4 py-2 text-white disabled:opacity-50"
-          type="button"
-          disabled={connecting}
-          onClick={() => connect({ connector: connectors[0] })}
-        >
-          지갑 연결
-        </button>
-      ) : (
-        <p className="text-sm">연결됨 {address}</p>
-      )}
-
-      <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-        <label className="flex flex-col gap-1 text-sm">
-          약정서 (PDF · TXT · 이미지)
-          <input accept={AGREEMENT_ACCEPT} className="text-sm" type="file" onChange={(event) => onHashFile(event.target.files?.[0] ?? null)} />
-        </label>
-        {hash ? <p className="text-xs text-zinc-500">약정 해시 {hash.slice(0, 18)}…</p> : null}
-        <button
-          className="w-fit rounded-full bg-zinc-900 px-4 py-2 text-white disabled:opacity-50"
-          type="submit"
-          disabled={!file || !isConnected || submitting || signing}
-        >
-          {submitting || signing ? "처리 중" : "서명 후 등록"}
-        </button>
-        {error ? <p className="text-red-700">{error}</p> : null}
-      </form>
+      <Card>
+        <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+          <CardTitle>약정 업로드</CardTitle>
+          <FieldLabel>
+            약정서 (PDF · TXT · 이미지)
+            <Input accept={AGREEMENT_ACCEPT} type="file" onChange={(event) => onHashFile(event.target.files?.[0] ?? null)} />
+          </FieldLabel>
+          {hash ? (
+            <p className="font-mono text-xs text-muted">
+              약정 해시 <span className="text-foreground">{hash.slice(0, 18)}…</span>
+            </p>
+          ) : null}
+          <Button className="w-fit" type="submit" disabled={!file || !isConnected || submitting || signing}>
+            {submitting || signing ? "처리 중" : "서명 후 등록"}
+          </Button>
+          {error ? <Alert tone="danger">{error}</Alert> : null}
+        </form>
+      </Card>
 
       {done ? (
-        <section className="rounded-xl border p-4 text-sm">
-          <p className="font-semibold">등록 완료</p>
-          <p>해시 {done.agreementHash}</p>
-          <p className="text-zinc-500">{new Date(done.submittedAt).toLocaleString("ko-KR")}</p>
-        </section>
+        <Card className="border-success/25">
+          <CardTitle>등록 완료</CardTitle>
+          <p className="font-mono text-xs break-all text-muted">{done.agreementHash}</p>
+          <p className="text-xs text-muted">{new Date(done.submittedAt).toLocaleString("ko-KR")}</p>
+        </Card>
       ) : null}
-    </main>
+    </PageMain>
   );
 }
 

@@ -1,26 +1,134 @@
 @import "tailwindcss";
 
+/* Kraken tokens on the existing ribbon canvas */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f3f3f3;
+  --sidebar: rgba(255, 255, 255, 0.9);
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --border: #dedee5;
+  --border-strong: #5741d8;
+  --foreground: #101114;
+  --muted: #686b82;
+  --muted-2: #9497a9;
+  --accent: #7132f5;
+  --accent-muted: rgba(133, 91, 251, 0.16);
+  --accent-hover: #5741d8;
+  --accent-deep: #5b1ecf;
+  --danger: #c23b3b;
+  --danger-muted: rgba(194, 59, 59, 0.12);
+  --warning: #b45309;
+  --warning-muted: rgba(180, 83, 9, 0.12);
+  --success: #149e61;
+  --success-fg: #026b3f;
+  --success-muted: rgba(20, 158, 97, 0.16);
+  --radius: 12px;
+  --shadow-subtle: 0 4px 24px rgba(0, 0, 0, 0.03);
+  --shadow-micro: 0 1px 4px rgba(16, 24, 40, 0.04);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-accent: var(--accent);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-deep: var(--accent-deep);
+  --color-danger: var(--danger);
+  --color-danger-muted: var(--danger-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-success: var(--success);
+  --color-success-fg: var(--success-fg);
+  --color-success-muted: var(--success-muted);
+  --font-sans: var(--font-ibm-plex);
+  --font-display: var(--font-ibm-plex);
   --font-mono: var(--font-geist-mono);
+  --radius-lg: var(--radius);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
+  background: transparent;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-ibm-plex), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.38;
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(148, 151, 169, 0.08);
+  color: var(--foreground);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+input[type="file"]::file-selector-button:hover {
+  border-color: var(--accent);
+}
+
+/* Liquid glass tab bar — opaque enough to read as a bar on the ribbon */
+.tab-glass {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+  border: 1px solid rgba(222, 222, 229, 0.95);
+  box-shadow:
+    0 12px 36px rgba(16, 24, 40, 0.12),
+    0 2px 8px rgba(16, 24, 40, 0.06),
+    0 1px 0 rgba(255, 255, 255, 1) inset;
+  backdrop-filter: blur(28px) saturate(1.45);
+  -webkit-backdrop-filter: blur(28px) saturate(1.45);
+}
+
+.tab-glass::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent 55%);
+}
+
+.tab-glass-pill {
+  background: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.94));
+  border: 1px solid rgba(222, 222, 229, 0.9);
+  box-shadow:
+    0 4px 14px rgba(113, 50, 245, 0.14),
+    0 1px 0 #fff inset,
+    0 0 0 1px rgba(113, 50, 245, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

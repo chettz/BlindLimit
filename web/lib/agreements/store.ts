@@ -32,6 +32,12 @@ function filePath(agreementHash: Hex, fileName?: string): string {
   return path.join(agreementsDir(), `${agreementHash.slice(2)}${ext}`);
 }
 
+export async function listAgreementsForLender(lender: Address): Promise<AgreementListItem[]> {
+  const key = getAddress(lender).toLowerCase();
+  const rows = await listAgreements();
+  return rows.filter((row) => row.lender.toLowerCase() === key);
+}
+
 export async function listAgreements(): Promise<AgreementListItem[]> {
   try {
     const raw = await readFile(catalogPath(), "utf8");

@@ -4,8 +4,14 @@ import { saveAgreement } from "@/lib/agreements/store";
 import { readAgreementUpload } from "@/lib/agreements/upload";
 import { PipelineError } from "@/lib/pipeline";
 
-export async function GET() {
-  const { listAgreements } = await import("@/lib/agreements/store");
+export async function GET(request: Request) {
+  const { listAgreements, listAgreementsForLender } = await import("@/lib/agreements/store");
+  const lender = new URL(request.url).searchParams.get("lender");
+  if (lender) {
+    if (!isAddress(lender)) return Response.json({ error: "대출사 주소가 올바르지 않습니다" }, { status: 400 });
+    const rows = await listAgreementsForLender(getAddress(lender));
+    return Response.json({ agreements: rows });
+  }
   const rows = await listAgreements();
   return Response.json({ agreements: rows });
 }

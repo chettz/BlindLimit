@@ -5,6 +5,11 @@ import { BaseError, ContractFunctionRevertedError, type Address, type Hex } from
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 
 import { loanPoolAbi } from "@/lib/chain/abi";
+import { Button } from "@/components/ui/button";
+import { Card, CardTitle } from "@/components/ui/card";
+import { Stat, StatGrid } from "@/components/ui/stat";
+import { Alert, TextLink } from "@/components/ui/page-shell";
+
 import { formatUsdc, txUrl } from "@/lib/chain/display";
 
 type LimitReceipt = {
@@ -41,18 +46,26 @@ export function PoolDashboard({ address }: { address: Address }) {
     let cancelled = false;
     void (async () => {
       try {
-        const logs = await publicClient.getContractEvents({
+        const { getContractEventsChunked } = await import("@/lib/chain/logScan");
+        const logs = await getContractEventsChunked(publicClient, {
           address,
           abi: loanPoolAbi,
           eventName: "LimitUpdated",
-          fromBlock: 0n,
-          toBlock: "latest",
         });
         if (cancelled) return;
+        const { eventArgs } = await import("@/lib/chain/logScan");
         const rows: LimitReceipt[] = logs
           .map((log) => {
-            if (!log.args || log.transactionHash === null) return undefined;
-            const args = log.args;
+            const args = eventArgs<{
+              docBundleHash?: Hex;
+              attestationHash?: Hex;
+              ruleHash?: Hex;
+              eligibleCount?: bigint;
+              eligibleAmount?: bigint;
+              newLimit?: bigint;
+              timestamp?: bigint;
+            }>(log);
+            if (!args || log.transactionHash === null) return undefined;
             if (
               args.docBundleHash === undefined ||
               args.attestationHash === undefined ||
@@ -115,22 +128,20 @@ export function PoolDashboard({ address }: { address: Address }) {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-2">
-        <p className="font-mono text-sm">{address}</p>
-        <a className="w-fit rounded-full bg-zinc-900 px-4 py-2 text-white" href={`/lender?pool=${address}`}>
-          이 풀에서 담보·대출
-        </a>
-      </section>
+      <Card>
+        <p className="font-mono text-xs text-muted">{address}</p>
+        <TextLink href={`/lender?pool=${address}`}>이 풀에서 담보·대출</TextLink>
+      </Card>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <Stat label="한도" value={limit.data === undefined ? "—" : `${formatUsdc(limit.data)} USDC`} />
+      <StatGrid className="sm:grid-cols-2 lg:grid-cols-2">
+        <Stat highlight label="한도" value={limit.data === undefined ? "—" : `${formatUsdc(limit.data)} USDC`} />
         <Stat label="차입 잔액" value={borrowed.data === undefined ? "—" : `${formatUsdc(borrowed.data)} USDC`} />
-      </section>
+      </StatGrid>
 
-      <section className="rounded-xl border p-4 text-sm">
-        <h2 className="mb-3 text-lg font-semibold">설정 (불변)</h2>
-        <p className="text-xs text-zinc-500 break-all">agreementHash {shortHex(agreementHash.data)}</p>
-        <p className="text-xs text-zinc-500 break-all">settingsHash {shortHex(settingsHash.data)}</p>
+      <Card className="text-sm">
+        <CardTitle>설정 (불변)</CardTitle>
+        <p className="text-xs text-muted break-all">agreementHash {shortHex(agreementHash.data)}</p>
+        <p className="text-xs text-muted break-all">settingsHash {shortHex(settingsHash.data)}</p>
         {s ? (
           <ul className="mt-3 flex flex-col gap-1">
             <li>선급률 {(Number(s.advanceRateBps) / 100).toFixed(2)}%</li>
@@ -141,51 +152,41 @@ export function PoolDashboard({ address }: { address: Address }) {
             <li>최대 약정 {formatUsdc(s.maxCommitment)} USDC</li>
           </ul>
         ) : (
-          <p className="mt-2 text-zinc-500">설정 불러오는 중…</p>
+          <p className="mt-2 text-muted">설정 불러오는 중…</p>
         )}
-      </section>
+      </Card>
 
       {isOperator ? (
-        <section className="flex flex-col gap-2">
-          <button
-            className="w-fit rounded-full border border-red-800 px-4 py-2 text-red-900 disabled:opacity-50"
-            type="button"
+        <Card>
+          <Button
+            variant="danger"
             disabled={locking || !settings.data}
             onClick={() => void tryUpdateSettings()}
           >
             {locking ? "호출 중" : "설정 변경 시도 (데모)"}
-          </button>
-          {lockMessage ? <p className="text-sm">{lockMessage}</p> : null}
-        </section>
+          </Button>
+          {lockMessage ? <Alert>{lockMessage}</Alert> : null}
+        </Card>
       ) : null}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">LimitUpdated 영수증</h2>
-        {loadError ? <p className="text-sm text-red-700">{loadError}</p> : null}
-        {receipts.length === 0 ? <p className="text-sm text-zinc-500">아직 한도 게시 이벤트가 없습니다.</p> : null}
+        <h2 className="text-[22px] font-semibold leading-[1.2] tracking-tight">LimitUpdated 영수증</h2>
+        {loadError ? <Alert tone="danger">{loadError}</Alert> : null}
+        {receipts.length === 0 ? <p className="text-sm text-muted">아직 한도 게시 이벤트가 없습니다.</p> : null}
         {receipts.map((row) => (
-          <article key={`${row.txHash}-${row.timestamp}`} className="rounded-xl border p-4 text-sm">
-            <p>{formatTime(Number(row.timestamp))}</p>
-            <p>적격 {row.eligibleCount.toString()}건 · {formatUsdc(row.eligibleAmount)} USDC</p>
-            <p>한도 {formatUsdc(row.newLimit)} USDC</p>
-            <p className="text-xs text-zinc-500 break-all">doc {shortHex(row.docBundleHash)}</p>
-            <p className="text-xs text-zinc-500 break-all">attestation {shortHex(row.attestationHash)}</p>
-            <p className="text-xs text-zinc-500 break-all">rule {shortHex(row.ruleHash)}</p>
-            <a className="underline" href={txUrl(row.txHash)}>
-              거래 {shortHex(row.txHash)}
-            </a>
-          </article>
+          <Card key={`${row.txHash}-${row.timestamp}`} className="text-sm">
+            <p className="text-muted">{formatTime(Number(row.timestamp))}</p>
+            <p>
+              적격 {row.eligibleCount.toString()}건 · {formatUsdc(row.eligibleAmount)} USDC
+            </p>
+            <p className="font-medium text-accent">한도 {formatUsdc(row.newLimit)} USDC</p>
+            <p className="text-xs text-muted break-all">doc {shortHex(row.docBundleHash)}</p>
+            <p className="text-xs text-muted break-all">attestation {shortHex(row.attestationHash)}</p>
+            <p className="text-xs text-muted break-all">rule {shortHex(row.ruleHash)}</p>
+            <TextLink href={txUrl(row.txHash)}>거래 {shortHex(row.txHash)}</TextLink>
+          </Card>
         ))}
       </section>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border px-4 py-3">
-      <p className="text-sm text-zinc-500">{label}</p>
-      <p className="text-lg">{value}</p>
     </div>
   );
 }
