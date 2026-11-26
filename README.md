@@ -35,103 +35,24 @@
 - **왜 enclave인가:** 추출·대사 과정에서 원문이 메모리에 잠깐이라도 올라가므로, 운영자·호스트·로그·클라이언트가 원문을 못 읽게 **TEE(NEAR AI Cloud 등) 안에서** 돌리는 것이 프라이버시 전제. Incognito(비-TEE) 모델은 사용하지 않음.
 - **제3자가 보는 것:** 해시와 집계뿐. “차주 아무개의 계약”이 아니라 “금액 불일치 N건, 이중 담보 M건” 수준의 참고 자료.
 
-*(현재: NEAR AI 추론은 TEE 경로, pipeline·오라클 키 일부는 아직 서버 — [현재 한계](#현재-한계). 로드맵은 pipeline 전체를 Phala CVM 등으로 이전.)*
+*(현재: `/verify` 암호 업로드는 브라우저에서 봉인한 뒤 **Phala CVM(TEE)** 에서 복호·`lib/rules` pipeline을 돌리고, 계약 필드 추출은 **NEAR AI Cloud TEE**에 맡깁니다. UI 호스트는 RSA 개인키가 없어 원문을 볼 수 없습니다.)*
 
-## What is BBC?
+## Borrowing Base Certificate란?
 
 **BBC (Borrowing Base Certificate):** 할부금융사가 은행·에이전트에 제출하는 담보 한도 신고(또는 테이프+요약). **1차는 할부금융사가 작성**, 은행은 샘플링·필드 실사로 견제. BlindLimit은 그 **작성·사전 자가 점검**을 가속합니다.
 
-## Architecture
+## 장부, 계약서 검증 흐름
 
-1. `/verify` — lender uploads contracts (`.pdf` / `.txt`) + loan tape (`.csv`). 기본은 **검증만**; 선택 시 온체인 `postLimit`.
-2. **TEE AI** extracts fields from contract images/PDFs; **`lib/rules`** joins on normalized VIN, registry check, borrowing base + exclusion codes.
-3. UI: aggregates only — no raw PII / row-level tape in logs or events.
-4. `/lender` — (on-chain extension) borrow within `availableToBorrow()` after a published limit.
+![BlindLimit sealed verify privacy data flow](docs/sealed-verify-privacy-flow.png)
 
-On-chain: `CollateralRegistry`, `LoanPool`, `PoolFactory` (Foundry, Base Sepolia or local Anvil).
+### 업로드 파일 암호화 과정
+1. 브라우저가 일회용 AES 키를 만듦
+2. 해당 AES 키로 계약서·장부를 암호화
+3. AES 키를 TEE의 RSA 공개키로 감쌈
+4. TEE만 가진 RSA 개인키로 AES 키를 풀고 → AES로 원문 복호화
+5. Near AI 추출 + rules 계산 → 집계·해시만 금융사에 반환
 
-Off-chain: Next.js App Router, `web/lib/pipeline.ts`.
+### 전체 흐름
+할부금융사가 /verify에서 계약서(.pdf/.txt)와 장부(.csv)를 고릅니다. 브라우저가 CVM에 RSA 공개키(및 quote)를 받은 뒤, 위처럼 봉인해 암호문 + 감싼 AES 키만 CVM으로 보냅니다. UI 호스트(Vercel 등)는 개인키가 없어 원문을 볼 수 없습니다.
 
-## Run locally
-
-### One-shot (anvil fork → fund → deploy → Otterscan)
-
-```bash
-# contracts/.env 에 DEPLOYER_PRIVATE_KEY, LENDER/OPERATOR/ORACLE, fork URL 필요
-./scripts/local-setup.sh
-# 출력 주소를 web/.env.local 에 반영
-```
-
-### Contracts (manual)
-
-```bash
-cd contracts
-cp .env.example .env
-# DEPLOYER_PRIVATE_KEY, LENDER_ADDRESS, OPERATOR_ADDRESS, ORACLE_ADDRESS — set in .env only (never commit)
-forge test
-anvil --chain-id 31337
-# another terminal:
-./scripts/fork-fund.sh
-forge script script/DeployM1.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
-forge script script/DeployFactory.s.sol --rpc-url http://127.0.0.1:8545 --broadcast
-```
-
-### Web
-
-```bash
-cd web
-cp .env.example .env.local
-# ORACLE_PRIVATE_KEY, VIN_SALT, NEARAI_API_KEY, REGISTRY/USDC/POOL/FACTORY addresses — see .env.example
-env -u BASE_SEPOLIA_RPC_URL pnpm dev
-```
-
-MetaMask: **Localhost 8545**, chain ID **31337**.
-
-Optional: `TEE_PROVIDER=mock` for offline demos (UI shows MOCK badge).
-
-## Deployed addresses (fill after broadcast)
-
-| Item | Address |
-|------|---------|
-| Registry | _(from deploy logs)_ |
-| USDC | _(from deploy logs)_ |
-| Pool A | _(from deploy logs)_ |
-| Factory | _(from deploy logs)_ |
-
-## Demo script (4 scenes)
-
-스토리: **할부금융사 자가 검증** → **온체인 풀 집행 연결**.
-
-1. **약정 불일치 차단:** `/operator` — agreement vs settings (e.g. 90% vs 85%).
-2. **자가 장부 검증:** `/verify` — PDF/txt 계약 + CSV → 적격/제외 집계 (핵심).
-3. **온체인 집행 — 대출 성공 / revert:** `/lender` — 한도 안/밖 borrow → `ExceedsLimit`.
-4. **설정 불변:** `/pool/[address]` — `SettingsLocked`.
-
-## 현재 한계
-
-- 오라클 키(`ORACLE_PRIVATE_KEY`)와 `VIN_SALT` 는 아직 TEE 밖(Next.js 서버). TEE 경로의 중심은 NEAR AI **계약서 추출**; 한도 계산·장부 파싱·영수증 게시는 서버 쪽도 있음.
-- **`/verify` 검증만:** 계약서(`.pdf`/`.txt`)·장부(`.csv`)는 브라우저에서 AES-GCM+RSA-OAEP 봉인 후 전송되고 서버 메모리에서만 복호화한다 (`GET /api/attestation-key`, `MOCK_TEE`). 온체인 게시 체크 경로는 아직 평문 FormData.
-- **최종 한도 승인·신용 결정 대체 아님** — 내부 점검 가속 + (선택) 제3자 참고.
-
-로컬 CVM 흉내: `MOCK_TEE=true` 로 루트에서 `docker compose up --build`.
-
-### Phala CVM (2차)
-
-1. `web` 이미지를 Phala Cloud(dstack)에 배포하고 CVM 안에 `/var/run/dstack.sock` 마운트.
-2. CVM env: `MOCK_TEE=false`, `VIN_SALT`, `ORACLE_PRIVATE_KEY`, `NEARAI_*` 등 — **UI만 돌리는 호스트에는 넣지 않음**.
-3. UI(또는 로컬 `pnpm dev`)에 `NEXT_PUBLIC_TEE_API_BASE=https://<cvm-public-url>` 설정 → `/verify` 암호 요청이 CVM의 `/api/attestation-key`·`/api/collateral`로만 감.
-4. CVM에서 `GET /api/attestation-key` 가 `mock:false` + `quote`(공개키 해시 bind)이면 정상.
-5. sock 있는 머신 로컬 확인: `docker compose --profile cvm up --build`.
-
-이 구성에서 **UI 서버 운영자는 RSA 개인키를 갖지 않아** 암호문을 풀 수 없다. (CVM 호스트 관리자 비열람은 TDX/Phala 신뢰 모델에 의존.)
-
-## 로드맵 / Roadmap
-
-① `pipeline` + 오라클 키 + `VIN_SALT` → Phala CVM — 검증만 암호 업로드 착수 ② attestation 온체인 검증 ③ 수정 약정 흐름 ④ Nesa provider ⑤ 기존 풀에 검증 레이어 연동 ⑥ 온체인 게시 경로 암호 업로드
-
-## Tests
-
-```bash
-cd contracts && forge test
-cd web && pnpm vitest run && pnpm build
-```
+CVM(TEE)에서 RSA로 AES 키를 복원하고 파일을 풀어, Near AI TEE에 계약 추출을 맡기고, 장부와 VIN 조인·연체·한도 등 결정론 코드를 돌립니다. 끝나면 적격 건수·제외 사유 건수·한도·attestationHash 같은 집계만 금융사 화면에 돌아갑니다.
