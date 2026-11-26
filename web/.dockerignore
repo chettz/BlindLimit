@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.private
+.env
+.env.*
+!.env.example
+*.md
+.pnpm-store
+coverage
+test-results
+Dockerfile
+.dockerignore
+# .npmrc 는 이미지 빌드에 필요 — 제외하지 않음

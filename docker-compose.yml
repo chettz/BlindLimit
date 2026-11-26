@@ -1,0 +1,29 @@
+# 로컬 MOCK / Phala CVM(dstack.sock) 용
+services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./web/.env.local
+    environment:
+      MOCK_TEE: "true"
+      TEE_PROVIDER: mock
+
+  # Phala CVM 안(또는 sock 있는 호스트)에서: docker compose --profile cvm up --build
+  web-cvm:
+    profiles: ["cvm"]
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./web/.env.local
+    environment:
+      MOCK_TEE: "false"
+      TEE_PROVIDER: ${TEE_PROVIDER:-nearai}
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock

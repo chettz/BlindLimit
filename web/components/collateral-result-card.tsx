@@ -18,6 +18,8 @@ export type CollateralResult = {
   vinsRegistered: number;
   txHash: string;
   mock: boolean;
+  /** TEE/영수증 attestation 해시. API가 주면 표시 */
+  attestationHash?: string;
   /** 없으면 txHash 유무로 판단 */
   published?: boolean;
 };
@@ -68,6 +70,11 @@ export function CollateralResultCard({
       ) : (
         <p className="text-sm text-muted">온체인 풀에는 게시하지 않았습니다.</p>
       )}
+      {result.attestationHash ? (
+        <p className="break-all font-mono text-xs text-muted" title={result.attestationHash}>
+          attestation {shortHash(result.attestationHash)}
+        </p>
+      ) : null}
       {published && borrowHref ? (
         <p className="text-sm">
           <TextLink href={borrowHref}>이 풀에서 온체인 대출하기</TextLink>

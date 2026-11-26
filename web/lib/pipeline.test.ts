@@ -172,8 +172,16 @@ describe("runBorrowingBase", () => {
     expect(json(result)).not.toContain(MISSING);
   });
 
-  it("skips postLimit when publish is false", async () => {
+  it("skips postLimit and registry check when publish is false", async () => {
+    let checked = 0;
     const { port, posts } = chain();
+    const wrapped: typeof port = {
+      ...port,
+      async checkBatch(hashes) {
+        checked += 1;
+        return port.checkBatch(hashes);
+      },
+    };
     const result = await runBorrowingBase(
       {
         pool: POOL,
@@ -181,13 +189,16 @@ describe("runBorrowingBase", () => {
         contracts: [file(GOOD, "10000")],
         tapeCsv: tape([`L1,${GOOD},${BORROWER},North Motors,29.90,100.00,90.00,0`]),
       },
-      deps(port),
+      deps(wrapped),
     );
 
     expect(posts).toHaveLength(0);
+    expect(checked).toBe(0);
     expect(result.txHash).toBe("");
+    expect(result.excluded.VIN_PLEDGED_ELSEWHERE).toBe(0);
     expect(result.eligibleCount).toBe(1);
-    expect(result.limit).toBe(90_000_000n);
+    // 검증만은 DEFAULT_SETTINGS(집중도 한도) — 풀 온체인 설정을 읽지 않음
+    expect(result.eligibleAmount).toBe(90_000_000n);
   });
 
   it("returns VIN_RACE when posting reverts with AlreadyPledged", async () => {

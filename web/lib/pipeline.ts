@@ -129,9 +129,12 @@ export async function runBorrowingBase(input: PipelineInput, deps: PipelineDeps)
   }
 
   const hashes = [...new Set(joined.map((row) => row.hash))].sort();
-  const pledged = await pledgedElsewhere(pool, hashes, deps.chain);
+  // 검증만: 온체인 이중담보·풀 설정 조회 생략 (RPC 불필요). 게시에만 체인 사용.
+  const pledged = publish
+    ? await pledgedElsewhere(pool, hashes, deps.chain)
+    : new Map<`0x${string}`, boolean>();
   const settings =
-    pool === zeroAddress ? DEFAULT_SETTINGS : await deps.chain.readSettings(pool);
+    !publish || pool === zeroAddress ? DEFAULT_SETTINGS : await deps.chain.readSettings(pool);
   const base = computeBorrowingBase(
     joined.map((row) => ({
       idHash: row.hash,

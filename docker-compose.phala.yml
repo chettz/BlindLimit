@@ -1,0 +1,25 @@
+# Phala Cloud 대시보드 / `phala deploy -c docker-compose.phala.yml` 용
+# 1) 이미지를 GHCR/Docker Hub에 푸시한 뒤 IMAGE 를 바꿔라
+# 2) Encrypted Secrets에 아래 ${...} 키를 넣는다 (평문을 compose에 쓰지 말 것)
+services:
+  web:
+    image: g0rani85/blindlimit-web:v5
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock
+    environment:
+      MOCK_TEE: "false"
+      TEE_PROVIDER: ${TEE_PROVIDER}
+      NEARAI_API_KEY: ${NEARAI_API_KEY}
+      NEARAI_MODEL: ${NEARAI_MODEL:-Qwen/Qwen3-VL-30B-A3B-Instruct}
+      NEARAI_LONG_MODEL: ${NEARAI_LONG_MODEL:-z-ai/glm-5.3-flash}
+      ORACLE_PRIVATE_KEY: ${ORACLE_PRIVATE_KEY}
+      VIN_SALT: ${VIN_SALT}
+      BASE_SEPOLIA_RPC_URL: ${BASE_SEPOLIA_RPC_URL:-https://sepolia.base.org}
+      REGISTRY_ADDRESS: ${REGISTRY_ADDRESS}
+      USDC_ADDRESS: ${USDC_ADDRESS}
+      POOL_A_ADDRESS: ${POOL_A_ADDRESS:-}
+      NEXT_PUBLIC_POOL_ADDRESS: ${NEXT_PUBLIC_POOL_ADDRESS:-}
+      NEXT_PUBLIC_USDC_ADDRESS: ${NEXT_PUBLIC_USDC_ADDRESS:-}
+      NEXT_PUBLIC_FACTORY_ADDRESS: ${NEXT_PUBLIC_FACTORY_ADDRESS:-}

@@ -1,10 +1,8 @@
-# BlindLimit (sealbase)
+# BlindLimit
 
 할부금융사가 **계약서(PDF·이미지)와 대출장부**를 사람이 전수 대사하기 전에, **TEE 안에서 AI 추출 + 결정론 코드**로 자가 검증을 빠르게 돌리는 프라이버시 담보 검증 레이어입니다. 핵심은 대출을 중개하는 풀이 아니라 **원문을 외부에 노출하지 않는 검증**입니다. 이를 온체인으로 확장하면, 같은 검증 결과를 온체인 대출 풀의 담보 한도·집행(`postLimit` / `borrow`)까지 연결할 수 있습니다.
 
-**English:** A privacy **collateral self-check layer** for installment lenders — AI reads PDF/image contracts inside a TEE; deterministic rules join the loan tape. Only hashes and aggregates leave. The core is off-chain (TEE) verification; the same result can extend on-chain to **pool borrowing-base enforcement** (`postLimit` / `borrow`).
-
-## Who / Why
+## 사용 대상
 
 | | |
 |--|--|
@@ -15,7 +13,7 @@
 
 ## Privacy: 왜 TEE 안에서 AI와 코드가 돌아가야 하나
 
-### 계약서에 무엇이 있나
+### 계약서에 포함된 민감정보들
 
 할부계약 원문에는 외부 유출을 꺼리는 정보가 포함되는 것이 일반적입니다.
 
@@ -112,12 +110,24 @@ Optional: `TEE_PROVIDER=mock` for offline demos (UI shows MOCK badge).
 ## 현재 한계
 
 - 오라클 키(`ORACLE_PRIVATE_KEY`)와 `VIN_SALT` 는 아직 TEE 밖(Next.js 서버). TEE 경로의 중심은 NEAR AI **계약서 추출**; 한도 계산·장부 파싱·영수증 게시는 서버 쪽도 있음.
-- 원문 업로드가 브라우저→서버 평문으로 남을 수 있음(로드맵: 암호 업로드 후 CVM 메모리만 복호화).
+- **`/verify` 검증만:** 계약서(`.pdf`/`.txt`)·장부(`.csv`)는 브라우저에서 AES-GCM+RSA-OAEP 봉인 후 전송되고 서버 메모리에서만 복호화한다 (`GET /api/attestation-key`, `MOCK_TEE`). 온체인 게시 체크 경로는 아직 평문 FormData.
 - **최종 한도 승인·신용 결정 대체 아님** — 내부 점검 가속 + (선택) 제3자 참고.
+
+로컬 CVM 흉내: `MOCK_TEE=true` 로 루트에서 `docker compose up --build`.
+
+### Phala CVM (2차)
+
+1. `web` 이미지를 Phala Cloud(dstack)에 배포하고 CVM 안에 `/var/run/dstack.sock` 마운트.
+2. CVM env: `MOCK_TEE=false`, `VIN_SALT`, `ORACLE_PRIVATE_KEY`, `NEARAI_*` 등 — **UI만 돌리는 호스트에는 넣지 않음**.
+3. UI(또는 로컬 `pnpm dev`)에 `NEXT_PUBLIC_TEE_API_BASE=https://<cvm-public-url>` 설정 → `/verify` 암호 요청이 CVM의 `/api/attestation-key`·`/api/collateral`로만 감.
+4. CVM에서 `GET /api/attestation-key` 가 `mock:false` + `quote`(공개키 해시 bind)이면 정상.
+5. sock 있는 머신 로컬 확인: `docker compose --profile cvm up --build`.
+
+이 구성에서 **UI 서버 운영자는 RSA 개인키를 갖지 않아** 암호문을 풀 수 없다. (CVM 호스트 관리자 비열람은 TDX/Phala 신뢰 모델에 의존.)
 
 ## 로드맵 / Roadmap
 
-① `pipeline` + 오라클 키 + `VIN_SALT` → Phala CVM (원문·AI·규칙이 한 enclave) ② attestation 온체인 검증 ③ 수정 약정 흐름 ④ Nesa provider ⑤ 기존 풀에 검증 모듈 연동
+① `pipeline` + 오라클 키 + `VIN_SALT` → Phala CVM — 검증만 암호 업로드 착수 ② attestation 온체인 검증 ③ 수정 약정 흐름 ④ Nesa provider ⑤ 기존 풀에 검증 레이어 연동 ⑥ 온체인 게시 경로 암호 업로드
 
 ## Tests
 
