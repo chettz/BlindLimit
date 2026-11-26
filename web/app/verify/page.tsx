@@ -122,7 +122,7 @@ function VerifyPageContent() {
     <PageMain>
       <PageHeader
         title="계약서·장부 검증"
-        description="할부계약서와 대출장부를 TEE환경에서 처리합니다. 검증만 실행 시 브라우저에서 암호화해 전송하고, 화면에는 적격·제외 집계만 남습니다."
+        description="할부계약서와 대출장부를 TEE환경에서 처리합니다. 업로드한 파일은 tee환경에서만 복호화되어 처리되고 외부로 유출되지 않습니다."
       />
 
       <Card>

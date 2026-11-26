@@ -140,7 +140,7 @@ function LenderPageContent() {
       {!ready ? <Alert>풀 주소가 설정되지 않았습니다</Alert> : null}
       {readsLocalFork() ? (
         <Alert tone="warning">
-          이 화면은 로컬 포크를 봅니다. 지갑에서 Localhost 8545를 선택하세요. 체인 ID는 31337입니다.
+          로컬 테스트넷 환경에서만 동작
         </Alert>
       ) : null}
       {isConnected && chainId !== appChain().id ? (

@@ -62,8 +62,9 @@ export function CollateralResultCard({
         ))}
       </ul>
       <p className="text-sm text-muted">
-        적격 VIN <span className="text-foreground">{result.vinsRegistered}</span>건 · 산출 한도{" "}
+        적격 VIN <span className="text-foreground">{result.vinsRegistered}</span>건 · 차입 가능 한도{" "}
         <span className="font-medium text-accent">{formatUsdc(BigInt(result.limit))} USDC</span>
+        <span className="text-muted"> (적격 잔여원금 − 집중도 초과분 × 선급률)</span>
       </p>
       {published ? (
         <TextLink href={txUrl(result.txHash)}>한도 게시 거래 {shortHash(result.txHash)}</TextLink>
@@ -71,8 +72,9 @@ export function CollateralResultCard({
         <p className="text-sm text-muted">온체인 풀에는 게시하지 않았습니다.</p>
       )}
       {result.attestationHash ? (
-        <p className="break-all font-mono text-xs text-muted" title={result.attestationHash}>
-          attestation {shortHash(result.attestationHash)}
+        <p className="break-all font-mono text-xs text-muted">
+          attestationHash {result.attestationHash}
+          <span className="font-sans"> (TEE 검증 영수증 JSON의 keccak256 해시)</span>
         </p>
       ) : null}
       {published && borrowHref ? (
